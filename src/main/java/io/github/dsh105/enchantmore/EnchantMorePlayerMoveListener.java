@@ -5,6 +5,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -109,20 +110,20 @@ public class EnchantMorePlayerMoveListener implements Listener {
             }*/
 
             // TODO: Boots + Knockback = bounce on fall
-            /*
+
             if (EnchantMoreListener.hasEnch(boots, EnchantMoreListener.KNOCKBACK, player)) {
                 if (event.getTo().getY() < event.getFrom().getY()) {
                     Block block = event.getTo().getBlock();
                     Block land = block.getRelative(BlockFace.DOWN);
 
-                    plugin.log.info("land="+land);
+                    plugin.getLogger().info("land="+land);
                     if (land.getType() != Material.AIR) {
-                        int n = EnchantMoreListener.getLevel(boots, EnchantMoreListener.KNOCKBACK, player);
+                        int n = EnchantMoreListener.getLevel(boots, EnchantMoreListener.KNOCKBACK);
                         player.setVelocity(event.getPlayer().getVelocity().multiply(-n));
                     }
                 }
             }
-            */
+
         }
     }
 }

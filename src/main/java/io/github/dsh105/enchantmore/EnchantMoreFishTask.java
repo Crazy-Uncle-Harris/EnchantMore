@@ -19,7 +19,8 @@ public class EnchantMoreFishTask extends BukkitRunnable {
     public void run() {
         ItemStack tool = player.getItemInHand();
         if (tool != null && tool.getType() == Material.FISHING_ROD) {
-            world.dropItemNaturally(player.getLocation(), new ItemStack(Material.RAW_FISH, 1));
+            world.dropItemNaturally(player.getLocation(), new ItemStack(Material.LEGACY_RAW_FISH, 1));
+            //TODO UPDATE THIS TO ALL RAW FISH
             EnchantMoreListener.damage(tool, player);
         }
     }

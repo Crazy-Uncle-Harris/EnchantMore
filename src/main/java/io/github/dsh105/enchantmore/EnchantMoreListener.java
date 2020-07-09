@@ -4,16 +4,25 @@ import com.dsh105.dshutils.Particle;
 import com.dsh105.dshutils.util.StringUtil;
 import com.dsh105.dshutils.util.ReflectionUtil;
 
+import net.minecraft.server.v1_14_R1.*;
 import org.bukkit.*;
+import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.type.Farmland;
+import org.bukkit.block.data.type.Leaves;
+import org.bukkit.block.data.type.Slab;
 import org.bukkit.configuration.MemorySection;
-import org.bukkit.craftbukkit.v1_7_R2.inventory.CraftItemStack;
-import org.bukkit.craftbukkit.v1_7_R2.CraftWorld;
-import org.bukkit.craftbukkit.v1_7_R2.entity.CraftArrow;
-import org.bukkit.craftbukkit.v1_7_R2.entity.CraftPlayer;
+import org.bukkit.craftbukkit.v1_14_R1.CraftWorld;
+import org.bukkit.craftbukkit.v1_14_R1.entity.CraftPlayer;
+import org.bukkit.craftbukkit.v1_14_R1.inventory.CraftItemStack;
+import org.bukkit.craftbukkit.v1_14_R1.entity.CraftArrow;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.*;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Item;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -24,9 +33,17 @@ import org.bukkit.event.entity.*;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.*;
+import org.bukkit.inventory.FurnaceRecipe;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.meta.PotionMeta;
+import org.bukkit.material.MaterialData;
+import org.bukkit.material.MonsterEggs;
+import org.bukkit.material.Step;
 import org.bukkit.potion.Potion;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.potion.PotionType;
 import org.bukkit.projectiles.ProjectileSource;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
@@ -79,9 +96,9 @@ public class EnchantMoreListener implements Listener {
 
     static boolean defaultEffectEnabledState = true;
 
-    static ConcurrentHashMap<Integer, Boolean> effectEnabledMap = new ConcurrentHashMap<Integer, Boolean>(); //List of enabled enchantment effects by packed enchantment and item id
-    static ConcurrentHashMap<Integer, String> effectConfigSections = new ConcurrentHashMap<Integer, String>();
-    static ConcurrentHashMap<Integer, EnchantMoreItemCategory> itemToCategory = new ConcurrentHashMap<Integer, EnchantMoreItemCategory>();
+    static ConcurrentHashMap<String, Boolean> effectEnabledMap = new ConcurrentHashMap<String, Boolean>(); //List of enabled enchantment effects by packed enchantment and item id
+    static ConcurrentHashMap<String, String> effectConfigSections = new ConcurrentHashMap<String, String>();
+    static ConcurrentHashMap<Material, EnchantMoreItemCategory> itemToCategory = new ConcurrentHashMap<Material, EnchantMoreItemCategory>();
     static ConcurrentHashMap<String, Enchantment> enchByName = new ConcurrentHashMap<String, Enchantment>();
     static ConcurrentHashMap<Enchantment, String> nameByEnch = new ConcurrentHashMap<Enchantment, String>();
     static ConcurrentHashMap<EnchantMoreItemCategory, Object> categoryToItem = new ConcurrentHashMap<EnchantMoreItemCategory, Object>();
@@ -103,13 +120,13 @@ public class EnchantMoreListener implements Listener {
         if (item == null) {
             return false;
         }
-        if (getEffectEnabled(item.getTypeId(), ench)) { //Check if the effect is disabled in configuration
+        if (getEffectEnabled(item.getType(), ench)) { //Check if the effect is disabled in configuration
             if (item.containsEnchantment(ench)) {
                 return checkPerm(item, ench, player);
             }
         } else if (plugin.getConfig().getBoolean("debugDisabledEffects")) {
             if (!disableMsgCooldown.contains(player.getName())) {
-                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + item.getType() + " (" + item.getTypeId() + ") + " + ench + " = " + packEnchItem(item.getTypeId(), ench) + " is disabled.");
+                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + item.getType() + " (" + item.getType().toString() + ") + " + ench + " = " + packEnchItem(item.getType(), ench) + " is disabled.");
                 disableMsgCooldown.add(player.getName());
 
                 BukkitTask task = new BukkitRunnable() {
@@ -131,7 +148,7 @@ public class EnchantMoreListener implements Listener {
             if (plugin.getConfig().getBoolean("sendPermissionMessage")) {
                 if (plugin.getConfig().getBoolean("useCooldown")) {
                     if (!disablePermMsgCooldown.contains(player.getName())) {
-                        player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + item.getType() + " (" + item.getTypeId() + ") + " + ench + " = " + packEnchItem(item.getTypeId(), ench) + " requires " + ChatColor.GOLD + getPermission(item, ench) + ChatColor.RED + " permission.");
+                        player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + item.getType() + " (" + item.getType().toString() + ") + " + ench + " = " + packEnchItem(item.getType(), ench) + " requires " + ChatColor.GOLD + getPermission(item, ench) + ChatColor.RED + " permission.");
                         disablePermMsgCooldown.add(player.getName());
 
                         BukkitTask task = new BukkitRunnable() {
@@ -141,7 +158,7 @@ public class EnchantMoreListener implements Listener {
                         }.runTaskLater(plugin, plugin.getConfig().getInt("permMsgCooldownTicks", 6000));
                     }
                 } else {
-                    player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + item.getType() + " (" + item.getTypeId() + ") + " + ench + " = " + packEnchItem(item.getTypeId(), ench) + " requires " + ChatColor.GOLD + getPermission(item, ench) + ChatColor.RED + " permission.");
+                    player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + item.getType() + " (" + item.getType().toString() + ") + " + ench + " = " + packEnchItem(item.getType(), ench) + " requires " + ChatColor.GOLD + getPermission(item, ench) + ChatColor.RED + " permission.");
                 }
             }
         }
@@ -190,7 +207,7 @@ public class EnchantMoreListener implements Listener {
     }
 
     public static String getConfigSection(ItemStack item, Enchantment ench) {
-        return effectConfigSections.get(packEnchItem(item.getTypeId(), ench));
+        return effectConfigSections.get(packEnchItem(item.getType(), ench));
     }
 
     public int getConfigInt(String name, int defaultValue, ItemStack item, Enchantment ench) {
@@ -214,11 +231,11 @@ public class EnchantMoreListener implements Listener {
         if (s == null) {
             return defaultValue;
         }
-        int id = getTypeIdByName(s);
-        if (id == -1) {
+        Material id = getTypeIdByName(s);
+        if (id == Material.VOID_AIR) {
             return defaultValue;
         }
-        return Material.getMaterial(id);
+        return id;
     }
 
     private void loadConfig() {
@@ -229,8 +246,8 @@ public class EnchantMoreListener implements Listener {
             plugin.getLogger().severe("Error! Failed to load enchantment id data from config!");
         } else {
             for (String enchName : enchIDSection.getKeys(false)) { //Map a list of enchantment names and ids from the config
-                int id = plugin.getConfig().getInt("enchantmentIDs." + enchName);
-                Enchantment ench = Enchantment.getById(id);
+                String id = plugin.getConfig().getString("enchantmentIDs." + enchName);
+                Enchantment ench = Enchantment.getByName(id);//TODO REDO THIS ORDERING THINGY
                 enchByName.put(enchName.toLowerCase(), ench);
                 enchByName.put(ench.getName().toLowerCase(), ench);
                 enchByName.put(String.valueOf(id), ench);
@@ -253,28 +270,30 @@ public class EnchantMoreListener implements Listener {
                 List<String> itemNames = plugin.getConfig().getStringList("items." + categoryName);
                 for (String itemName : itemNames) {
                     String[] parts = itemName.split(";", 2);
-                    int id = getTypeIdByName(parts[0]);
-                    if (id == -1) {
+                    Material id = getTypeIdByName(parts[0]);
+                    if (id == Material.VOID_AIR) {
                         plugin.getLogger().warning("Item '" + itemName + "' invalid and ignored by EnchantMore.");
                         continue;
                     }
-                    //Item Data Field Check (Optional)
-                    int packedId = id;
-                    if (parts.length > 1) {
-                        int data = 0;
-                        try {
-                            data = Integer.parseInt(parts[1], 10);
-                        } catch (Exception e) {
-                            plugin.getLogger().warning("Item '" + parts[0] + "' invalid and ignored by EnchantExtreme");
-                            continue;
-                        }
-                        packedId += data << 10;
-                    }
-                    if (itemToCategory.contains(packedId)) { //Check if item already exists in a category
+//                    //Item Data Field Check (Optional)
+//                    int packedId = id.getId();
+//                    if (parts.length > 1) {
+//                        int data = 0;
+//                        try {
+//                            data = Integer.parseInt(parts[1], 10);
+//                        } catch (Exception e) {
+//                            plugin.getLogger().warning("Item '" + parts[0] + "' invalid and ignored by EnchantMore");
+//                            continue;
+//                        }
+//                        packedId += data << 10;
+//                    }
+                    //TODO IS THERE A REPLACEMENT?
+
+                    if (itemToCategory.contains(id)) { //Check if item already exists in a category
                         plugin.getLogger().warning("Overlapping item  '" + itemName + "' (" + id + "). Category " + itemToCategory.get(id) + "is not equal to " + category + "! Ignored by EnchantMore.");
                         continue;
                     }
-                    itemToCategory.put(packedId, category);
+                    itemToCategory.put(id, category);
                     Object obj = categoryToItem.get(category);
                     if (obj == null) {
                         obj = new ArrayList<Integer>();
@@ -316,14 +335,14 @@ public class EnchantMoreListener implements Listener {
                 }
                 List list = (List) obj;
                 for (Object item : list) {
-                    if (item instanceof Integer) {
-                        putEffectEnabled(((Integer) item).intValue(), ench, enable);
+                    if (item instanceof Material) {
+                        putEffectEnabled((Material)item, ench, enable);
                         //effectConfigSections.put(packEnchItem(((Integer)item).intValue(), ench), sectionName);
                     }
                 }
             } else { //It's not a category
-                int id = getTypeIdByName(itemName);
-                if (id == -1) {
+                Material id = getTypeIdByName(itemName);
+                if (id == Material.AIR) {
                     plugin.getLogger().warning("Item name '" + itemName + "' invalid and ignored by EnchantMore.");
                     continue;
                 }
@@ -333,14 +352,14 @@ public class EnchantMoreListener implements Listener {
         }
     }
 
-    static int packEnchItem(int itemId, Enchantment ench) { //Pack enchantment id and item id into a single integer for easy look up.
-        return itemId + (ench.getId()) << 20;
+    static String packEnchItem(Material material, Enchantment ench) { //Pack enchantment id and item id into a single integer for easy look up.
+        return material.name() + (ench.getKey());
     }
 
-    private void putEffectEnabled(int itemId, Enchantment ench, boolean enable) { //Enable an effect
-        int packed = packEnchItem(itemId, ench);
+    private void putEffectEnabled(Material material, Enchantment ench, boolean enable) { //Enable an effect
+        String packed = packEnchItem(material, ench);
         if (plugin.verboseLogger()) {
-            plugin.getLogger().info("Effect " + Material.getMaterial(itemId) + "(" + itemId + ") + " + ench + " = " + packed + " = " + enable);
+            plugin.getLogger().info("Effect " + material+ " " + ench + " = " + packed + " = " + enable);
         }
         /*if (effectEnabledMap.get(packed) != null) {
     		plugin.getLogger().severe("Overlapping effect! " + Material.getMaterial(itemId) + " (" + itemId + ") + " + ench + " = " + packed + " = " + enable);
@@ -348,12 +367,12 @@ public class EnchantMoreListener implements Listener {
         effectEnabledMap.put(packed, enable);
     }
 
-    public static boolean getEffectEnabled(int itemId, Enchantment ench) { //Check if an effect is enabled.
-        int packed = packEnchItem(itemId, ench);
+    public static boolean getEffectEnabled(Material material, Enchantment ench) { //Check if an effect is enabled.
+        String packed = packEnchItem(material, ench);
         Object obj = effectEnabledMap.get(packed);
         if (obj == null) {
             if (plugin.verboseLogger()) {
-                plugin.getLogger().info("Default state returned for " + Material.getMaterial(itemId) + " (" + itemId + ") + " + ench);
+                plugin.getLogger().info("Default state returned for " + material + " " + ench);
             }
             return defaultEffectEnabledState;
         }
@@ -370,19 +389,15 @@ public class EnchantMoreListener implements Listener {
 
     // Get material type ID, either from name or integer string
     // @returns -1 if error
-    public int getTypeIdByName(String name) {
+    public Material getTypeIdByName(String name) {
         Material material = Material.matchMaterial(name);
         if (material != null) {
-            return material.getId();
+            return material;
         } else {
             if (name.equalsIgnoreCase("flint & steel")) {
-                return Material.FLINT_AND_STEEL.getId();
+                return Material.FLINT_AND_STEEL;
             }
-            try {
-                return Integer.parseInt(name, 10);
-            } catch (Exception e) {
-                return -1;
-            }
+            return Material.VOID_AIR;
         }
     }
 
@@ -469,7 +484,7 @@ public class EnchantMoreListener implements Listener {
         return result;
     }
 
-    @SuppressWarnings("deprecation") //It's deprecated, but there is currently no replacement :(
+   @Deprecated  //It's deprecated, but there is currently no replacement :(
     public static void updateInventory(Player player) {
         player.updateInventory();
     }
@@ -488,9 +503,11 @@ public class EnchantMoreListener implements Listener {
                 y = loc.getBlockY(),
                 z = loc.getBlockZ();
         World world = loc.getWorld();
-        ItemStack boneMeal = (new ItemStack(Material.INK_SACK, 1, (short) 15));
-        net.minecraft.server.v1_7_R2.ItemStack craftBoneMeal = CraftItemStack.asNMSCopy(boneMeal);
-        net.minecraft.server.v1_7_R2.Items.INK_SACK.interactWith(craftBoneMeal, ((CraftPlayer) player).getHandle(), ((CraftWorld) world).getHandle(), x, y, z, 0, x, y, z);
+        ItemStack boneMeal = (new ItemStack(Material.BONE_MEAL, 1));
+        net.minecraft.server.v1_14_R1.ItemStack craftBoneMeal = CraftItemStack.asNMSCopy(boneMeal);
+        Items.BONE_MEAL.a(craftBoneMeal,(net.minecraft.server.v1_14_R1.World)world,(IBlockData)loc.getBlock().getBlockData(),(BlockPosition) null, (EntityLiving)player);
+        //TODO CORRECT NULL VALUE
+                //.interactWith(craftBoneMeal, ((CraftPlayer) player).getHandle(), ((CraftWorld) world).getHandle(), x, y, z, 0, x, y, z);
     }
 
     private String serialiseLocation(Location loc) { //Automagically transform a location into a String. Magic ain't it?
@@ -519,13 +536,14 @@ public class EnchantMoreListener implements Listener {
         return 20 * 10 * level;
     }
 
-    private void fellTree(Player player, Block start, ItemStack tool, int level, int id1, int id2, int id3) {
+    private void fellTree(Player player, Block start, ItemStack tool, int level, Material id1, Material id2, Material id3) {
         start.breakNaturally();
         for (int dx = -level; dx <= level; dx += 1) {
             for (int dy = -level; dy <= level; dy += 1) {
                 for (int dz = -level; dz <= level; dz += 1) {
                     Block branch = start.getRelative(dx, dy, dz);
-                    if ((branch != null) && (branch.getTypeId() == id1 || branch.getTypeId() == id2 || branch.getTypeId() == id3)) {
+                    if ((branch != null) && (branch.getType() == id1)) {
+                        //TODO ADD OTHER WOOD TYPES HERE
                         if (branch.breakNaturally()) {
                             plugin.getServer().getPluginManager().callEvent(new BlockBreakEvent(branch, player));
                         }
@@ -535,9 +553,9 @@ public class EnchantMoreListener implements Listener {
         }
     }
 
-    private void hedgeTrimmer(Player player, Block start, ItemStack till, int level, int itemId, Enchantment ench) {
+    private void hedgeTrimmer(Player player, Block start, ItemStack till, int level, Material itemId, Enchantment ench) {
         //TODO: do a sphere! or other shapes! topiary
-        int packed = packEnchItem(itemId, ench);
+        String packed = packEnchItem(itemId, ench);
         String shape = "square";
         if (plugin.getConfig().getString(packed + ".shape") == "sphere") {
             shape = "sphere";
@@ -547,7 +565,8 @@ public class EnchantMoreListener implements Listener {
                 for (int dy = -level; dy <= level; dy += 1) {
                     for (int dz = -level; dz <= level; dz += 1) {
                         Block leaf = start.getRelative(dx, dy, dz);
-                        if (leaf != null && leaf.getType() == Material.LEAVES) {
+                        if (leaf != null && leaf.getType() == Material.LEGACY_LEAVES) {
+                            //TODO ADD OTHER LEAVES HERE
                             leaf.breakNaturally();
                             plugin.getServer().getPluginManager().callEvent(new BlockBreakEvent(leaf, player));
                         }
@@ -592,15 +611,11 @@ public class EnchantMoreListener implements Listener {
                 if (finalRecipe instanceof ShapedRecipe) {
                     ShapedRecipe sr = (ShapedRecipe) finalRecipe;
                     Map<Character, ItemStack> index = sr.getIngredientMap();
-                    for (ItemStack itemstack : index.values()) {
-                        inputs.add(itemstack);
-                    }
+                    inputs.addAll(index.values());
                 } else if (finalRecipe instanceof ShapelessRecipe) {
                     ShapelessRecipe sr = (ShapelessRecipe) finalRecipe;
                     List<ItemStack> index = sr.getIngredientList();
-                    for (ItemStack itemstack : index) {
-                        inputs.add(itemstack);
-                    }
+                    inputs.addAll(index);
                 }
             }
             return inputs;
@@ -611,11 +626,11 @@ public class EnchantMoreListener implements Listener {
     }
 
     private boolean isSplashPotion(ItemStack item) { //Check if a potion is a splash potion (updated from old NMS code)
-        if (item.getType() != Material.POTION) {
+        if (item.getType() != Material.SPLASH_POTION) {
             return false;
+        }else{
+            return  true;
         }
-        Potion potion = new Potion(item.getDurability());
-        return potion.isSplash();
     }
 
     public EntityType creatureTypeFromId(int eid) {//TODO: Update this every time Minecraft brings in new mobs.
@@ -664,7 +679,7 @@ public class EnchantMoreListener implements Listener {
             case 42:
                 return EntityType.MINECART;
             case 43:
-                return EntityType.MINECART;
+                return EntityType.MINECART_CHEST;
             case 44:
                 return EntityType.MINECART;
             case 45:
@@ -864,7 +879,7 @@ public class EnchantMoreListener implements Listener {
             //Flint and Steel + Punch = Cannon
             if (hasEnch(item, PUNCH, player)) {
                 Location loc = player.getLocation().add(0, 2, 0);
-                if (plugin.canExplode(player, block, Material.FLINT_AND_STEEL.getId(), PUNCH)) {
+                if (plugin.canExplode(player, block, Material.FLINT_AND_STEEL, PUNCH)) {
                     TNTPrimed tnt = (TNTPrimed) world.spawn(loc, TNTPrimed.class);
                     int n = getLevel(item, PUNCH);
                     tnt.setVelocity(player.getLocation().getDirection().normalize().multiply(n));
@@ -873,7 +888,7 @@ public class EnchantMoreListener implements Listener {
             }
             //Flint and Steel + Silk Touch = Remote detonation (Ignite TNT)
             if (hasEnch(item, SILK_TOUCH, player)) {
-                if (plugin.canExplode(player, block, Material.FLINT_AND_STEEL.getId(), SILK_TOUCH)) {
+                if (plugin.canExplode(player, block, Material.FLINT_AND_STEEL, SILK_TOUCH)) {
                     world.createExplosion(player.getTargetBlock(null, 50).getLocation(), 4f);
     				/*int r = getLevel(item, SILK_TOUCH) * 10;
         			int x0 = player.getLocation().getBlockX();
@@ -903,7 +918,7 @@ public class EnchantMoreListener implements Listener {
             if (action == Action.LEFT_CLICK_AIR || action == Action.LEFT_CLICK_BLOCK) {
                 //Sword + Power = Strike lightning far away
                 if (hasEnch(item, POWER, player)) {
-                    if (plugin.canStrikeLightning(player, block, item.getTypeId(), POWER)) {
+                    if (plugin.canStrikeLightning(player, block, item.getType(), POWER)) {
                         int maxDistance = getConfigInt("rangePerLevel", 100, item, POWER);
                         Block target = player.getTargetBlock(null, maxDistance * getLevel(item, FLAME));
                         if (target != null) {
@@ -914,7 +929,7 @@ public class EnchantMoreListener implements Listener {
             } else if (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK) {
                 //Sword + Blast Protection = Shoot fireball (right click)
                 if (hasEnch(item, BLAST_PROTECTION, player)) {
-                    if (plugin.canExplode(player, block, item.getTypeId(), BLAST_PROTECTION)) {
+                    if (plugin.canExplode(player, block, item.getType(), BLAST_PROTECTION)) {
                         Vector vector = player.getEyeLocation().getDirection();
                         Projectile projectile = player.launchProjectile(Fireball.class);
                         projectile.setVelocity(vector);
@@ -929,7 +944,7 @@ public class EnchantMoreListener implements Listener {
                 if (getLevel(item, SILK_TOUCH) == minLevel && (action == Action.LEFT_CLICK_AIR || action == Action.LEFT_CLICK_BLOCK)) {
                     Block target = player.getTargetBlock(null, 3 * getLevel(item, SILK_TOUCH));
                     if (target.getType() == Material.FIRE) {
-                        if (plugin.canDropItem(player, block, item.getTypeId(), SILK_TOUCH)) {
+                        if (plugin.canDropItem(player, block, item.getType(), SILK_TOUCH)) {
                             world.dropItemNaturally(target.getLocation(), new ItemStack(target.getType(), 1));
                         }
                     }
@@ -937,8 +952,8 @@ public class EnchantMoreListener implements Listener {
                 //Shovel + Silk Touch III = Harvest Water, Lava and Fire
                 else if (getLevel(item, SILK_TOUCH) > minLevel && (action == Action.LEFT_CLICK_AIR || action == Action.LEFT_CLICK_BLOCK)) {
                     Block target = player.getTargetBlock(null, 3 * getLevel(item, SILK_TOUCH));
-                    if (target.getType() == Material.FIRE || target.getType() == Material.WATER || target.getType() == Material.STATIONARY_WATER || target.getType() == Material.LAVA || target.getType() == Material.STATIONARY_LAVA) {
-                        if (plugin.canDropItem(player, block, item.getTypeId(), SILK_TOUCH)) {
+                    if (target.getType() == Material.FIRE || target.getType() == Material.WATER || target.getType() == Material.LEGACY_STATIONARY_WATER || target.getType() == Material.LAVA || target.getType() == Material.LEGACY_STATIONARY_LAVA) {
+                        if (plugin.canDropItem(player, block, item.getType(), SILK_TOUCH)) {
                             world.dropItemNaturally(target.getLocation(), new ItemStack(target.getType(), 1));
                         }
                     }
@@ -949,7 +964,7 @@ public class EnchantMoreListener implements Listener {
             if (hasEnch(item, POWER, player)) {
                 int sign, amount;
                 switch (item.getType()) {
-                    case WOOD_HOE:
+                    case WOODEN_HOE:
                         amount = 1;
                         break;
                     case STONE_HOE:
@@ -959,7 +974,7 @@ public class EnchantMoreListener implements Listener {
                     case IRON_HOE:
                         amount = 100;
                         break;
-                    case GOLD_HOE:
+                    case GOLDEN_HOE:
                         amount = 10000;
                         break;
                     case DIAMOND_HOE:
@@ -1003,7 +1018,7 @@ public class EnchantMoreListener implements Listener {
                 player.sendMessage(ChatColor.DARK_AQUA + "Time: " + ChatColor.AQUA + world.getFullTime());
                 player.sendMessage(ChatColor.DARK_AQUA + "Sea Level: " + ChatColor.AQUA + world.getSeaLevel());
                 player.sendMessage(ChatColor.DARK_AQUA + "Weather: " + ChatColor.AQUA + world.getWeatherDuration());
-                player.sendMessage(ChatColor.DARK_AQUA + "Block: " + ChatColor.AQUA + target.getTypeId() + ";" + target.getData() + " (" + Material.getMaterial(target.getTypeId()) + ")");
+                player.sendMessage(ChatColor.DARK_AQUA + "Block: " + ChatColor.AQUA + target.getType() + ";" + target.getData() + " (" + Material.getMaterial(target.getType().name()) + ")");
                 player.sendMessage(ChatColor.DARK_AQUA + "Light: " + ChatColor.AQUA + target.getLightLevel() + " (" + target.getLightFromSky() + "/" + target.getLightFromBlocks() + ")");
                 player.sendMessage(
                         ChatColor.DARK_AQUA + "Data: " + ChatColor.AQUA +
@@ -1023,19 +1038,19 @@ public class EnchantMoreListener implements Listener {
         if (item.getType() == Material.SHEARS) {
             //Shears + Power = Hedge builder; cut grass (Secondary Effect)
             if (hasEnch(item, POWER, player)) {
-                if (plugin.canBuild(player, block, item.getTypeId(), POWER)) {
+                if (plugin.canBuild(player, block, item.getType(), POWER)) {
                     int n = getLevel(item, POWER);
                     //If grass, cut into dirt
                     if (block.getType() == Material.GRASS) {
-                        plugin.safeSetBlock(player, block, Material.DIRT, item.getTypeId(), POWER);
+                        plugin.safeSetBlock(player, block, Material.DIRT, item.getType(), POWER);
                         damage(item, player);
                     }
                     //If leaves, build hedges
-                    else if (block.getType() == Material.LEAVES) {
-                        int leavesSlot = player.getInventory().first(Material.LEAVES);
+                    else if (block.getType() == Material.LEGACY_LEAVES) {
+                        int leavesSlot = player.getInventory().first(Material.LEGACY_LEAVES);
                         if (leavesSlot != -1) {
                             ItemStack leavesStack = player.getInventory().getItem(leavesSlot);
-                            int packed = packEnchItem(item.getTypeId(), POWER);
+                            String packed = packEnchItem(item.getType(), POWER);
                             String shape = "square";
                             if (plugin.getConfig().getString(packed + ".shape") == "sphere") {
                                 shape = "sphere";
@@ -1046,10 +1061,16 @@ public class EnchantMoreListener implements Listener {
                                         for (int dz = -n; dz <= n; dz += 1) {
                                             Block b = block.getRelative(dx, dy, dz);
                                             if (b.getType() == Material.AIR && leavesStack.getAmount() > 0) {
-                                                plugin.safeSetBlock(player, b, leavesStack.getType(), item.getTypeId(), POWER);
-                                                byte data = leavesStack.getData().getData();
-                                                data |= 4; //Permanent player-placed leaves; never decay
-                                                b.setData(data);
+                                                plugin.safeSetBlock(player, b, leavesStack.getType(), item.getType(), POWER);
+                                                b.setType(leavesStack.getType());
+                                                BlockData state = b.getState().getBlockData();
+                                                if (state instanceof Leaves) {
+                                                    Leaves w = (Leaves) state;
+                                                    w.setPersistent(true);//Permanent player-placed leaves; never decay
+                                                } else {
+                                                    //not leaves...
+                                                }
+
                                                 leavesStack.setAmount(leavesStack.getAmount() - 1);
                                             }
                                         }
@@ -1060,10 +1081,15 @@ public class EnchantMoreListener implements Listener {
                                 for (Location loc : blocks) {
                                     Block b = loc.getBlock();
                                     if (b.getType() == Material.AIR && leavesStack.getAmount() > 0) {
-                                        plugin.safeSetBlock(player, b, leavesStack.getType(), item.getTypeId(), POWER);
-                                        byte data = leavesStack.getData().getData();
-                                        data |= 4; //Permanent player-placed leaves; never decay
-                                        b.setData(data);
+                                        plugin.safeSetBlock(player, b, leavesStack.getType(), item.getType(), POWER);
+                                        b.setType(leavesStack.getType());
+                                        BlockData state = b.getState().getBlockData();
+                                        if (state instanceof Leaves) {
+                                            Leaves w = (Leaves) state;
+                                           w.setPersistent(true);//Permanent player-placed leaves; never decay
+                                        } else {
+                                          //not leaves...
+                                        }
                                         leavesStack.setAmount(leavesStack.getAmount() - 1);
                                     }
                                 }
@@ -1082,7 +1108,7 @@ public class EnchantMoreListener implements Listener {
         } else if (item.getType() == Material.FLINT_AND_STEEL && action == Action.RIGHT_CLICK_BLOCK) {
             // Flint & Steel + Smite = Strike lightning
             if (hasEnch(item, SMITE, player)) {
-                if (plugin.canStrikeLightning(player, block, item.getTypeId(), SMITE)) {
+                if (plugin.canStrikeLightning(player, block, item.getType(), SMITE)) {
                     world.strikeLightning(block.getLocation());
                     damage(item, 9, player);
                 }
@@ -1094,10 +1120,10 @@ public class EnchantMoreListener implements Listener {
             //Flint & Steel + Aqua Affinity = Vaporise Water
             if (hasEnch(item, AQUA_AFFINITY, player)) {
                 //Find water within ignited cube area
-                if (plugin.canBuild(player, block.getLocation(), item.getTypeId(), AQUA_AFFINITY)) {
+                if (plugin.canBuild(player, block.getLocation(), item.getType(), AQUA_AFFINITY)) {
                     int r = getLevel(item, AQUA_AFFINITY);
                     String shape = "square";
-                    if (plugin.getConfig().getString(packEnchItem(item.getTypeId(), AQUA_AFFINITY) + ".shape") == "sphere") {
+                    if (plugin.getConfig().getString(packEnchItem(item.getType(), AQUA_AFFINITY) + ".shape") == "sphere") {
                         shape = "sphere";
                     }
                     if (shape.equalsIgnoreCase("square")) {
@@ -1109,8 +1135,8 @@ public class EnchantMoreListener implements Listener {
                             for (int dy = -r; dy <= r; dy += 1) {
                                 for (int dz = -r; dz <= r; dz += 1) {
                                     Block b = world.getBlockAt(dx + x0, dy + y0, dz + z0);
-                                    if (b.getType() == Material.STATIONARY_WATER || b.getType() == Material.WATER) {
-                                        plugin.safeSetBlock(player, b, Material.AIR, item.getTypeId(), AQUA_AFFINITY);
+                                    if (b.getType() == Material.LEGACY_STATIONARY_WATER || b.getType() == Material.WATER) {
+                                        plugin.safeSetBlock(player, b, Material.AIR, item.getType(), AQUA_AFFINITY);
                                         String effect = getConfigString("effect", "smoke", item, AQUA_AFFINITY);
                                         if (effect.equalsIgnoreCase("smoke")) {
                                             world.playEffect(b.getLocation(), Effect.SMOKE, 0);
@@ -1129,8 +1155,8 @@ public class EnchantMoreListener implements Listener {
                         List<Location> blocks = circle(block.getLocation(), 5, 5, true, true);
                         for (Location loc : blocks) {
                             Block b = loc.getBlock();
-                            if (b.getType() == Material.STATIONARY_WATER || b.getType() == Material.WATER) {
-                                plugin.safeSetBlock(player, b, Material.AIR, item.getTypeId(), AQUA_AFFINITY);
+                            if (b.getType() == Material.LEGACY_STATIONARY_WATER || b.getType() == Material.WATER) {
+                                plugin.safeSetBlock(player, b, Material.AIR, item.getType(), AQUA_AFFINITY);
                                 String effect = getConfigString("effect", "smoke", item, AQUA_AFFINITY);
                                 if (effect.equalsIgnoreCase("smoke")) {
                                     world.playEffect(b.getLocation(), Effect.SMOKE, 0);
@@ -1149,7 +1175,7 @@ public class EnchantMoreListener implements Listener {
             }
             //Flint & Steel + Sharpness = Firey explosion
             if (hasEnch(item, SHARPNESS, player)) {
-                if (plugin.canExplode(player, block, item.getTypeId(), SHARPNESS)) {
+                if (plugin.canExplode(player, block, item.getType(), SHARPNESS)) {
                     float power = (getLevel(item, SHARPNESS) - 1) * 1.0f;
                     world.createExplosion(block.getLocation(), power, true);
                     damage(item, player);
@@ -1161,15 +1187,15 @@ public class EnchantMoreListener implements Listener {
             //Flint & Steel + Efficiency = Burn Faster (Turn wood to leaves)
             if (hasEnch(item, EFFICIENCY, player)) {
                 if (isWoodenBlock(block.getType(), block.getData())) {
-                    if (plugin.canBuild(player, block, item.getTypeId(), EFFICIENCY)) {
-                        plugin.safeSetBlock(player, block, Material.LEAVES, item.getTypeId(), EFFICIENCY);
+                    if (plugin.canBuild(player, block, item.getType(), EFFICIENCY)) {
+                        plugin.safeSetBlock(player, block, Material.LEGACY_LEAVES, item.getType(), EFFICIENCY);
                     }
                 }
             }
         } else if (isHoe(item.getType())) {
             //Hoe + Aqua Affinity = Auto-Hydrate
             if (hasEnch(item, AQUA_AFFINITY, player)) {
-                if (plugin.canBuild(player, block, item.getTypeId(), AQUA_AFFINITY)) {
+                if (plugin.canBuild(player, block, item.getType(), AQUA_AFFINITY)) {
                     //As long as not in hell, hydrate nearby
                     if (world.getEnvironment() != World.Environment.NETHER) {
                         int n = getLevel(item, AQUA_AFFINITY);
@@ -1179,7 +1205,7 @@ public class EnchantMoreListener implements Listener {
                                 Block near = block.getRelative(dx * n, 0, dz * n);
                                 //If either air or flowing water, make stationary water
                                 if (near.getType() == Material.AIR || near.getType() == Material.WATER) {
-                                    plugin.safeSetBlock(player, near, Material.STATIONARY_WATER, item.getTypeId(), AQUA_AFFINITY);
+                                    plugin.safeSetBlock(player, near, Material.LEGACY_STATIONARY_WATER, item.getType(), AQUA_AFFINITY);
                                 }
                             }
                         }
@@ -1203,9 +1229,9 @@ public class EnchantMoreListener implements Listener {
                     if (random.nextInt(chance) == 0) {
                         int rollMax = getConfigInt("dropRollMax", 4, item, FORTUNE);
                         int roll = random.nextInt(rollMax);
-                        Material seedType = getConfigMaterial("drops." + roll, Material.SEEDS, item, FORTUNE);
+                        Material seedType = getConfigMaterial("drops." + roll, Material.WHEAT_SEEDS, item, FORTUNE);//TODO OTHER FOOD SEEDS
                         ItemStack drop = new ItemStack(seedType, 1);
-                        if (plugin.canDropItem(player, block, item.getTypeId(), SILK_TOUCH)) {
+                        if (plugin.canDropItem(player, block, item.getType(), SILK_TOUCH)) {
                             world.dropItemNaturally(block.getRelative(BlockFace.UP).getLocation(), drop);
                         }
                     }
@@ -1213,7 +1239,7 @@ public class EnchantMoreListener implements Listener {
             }
             //Hoe + Efficiency = Till larger area
             if (hasEnch(item, EFFICIENCY, player)) {
-                if (plugin.canBuild(player, block, item.getTypeId(), EFFICIENCY)) {
+                if (plugin.canBuild(player, block, item.getType(), EFFICIENCY)) {
                     int r = getLevel(item, EFFICIENCY);
                     Location loc = block.getLocation();
                     int x0 = loc.getBlockX();
@@ -1223,7 +1249,7 @@ public class EnchantMoreListener implements Listener {
                         for (int dz = -r; dz <= r; dz += 1) {
                             Block b = world.getBlockAt(dx + x0, y0, dz + z0);
                             if (b.getType() == Material.DIRT || b.getType() == Material.GRASS) {
-                                plugin.safeSetBlock(player, b, Material.SOIL, item.getTypeId(), EFFICIENCY);
+                                plugin.safeSetBlock(player, b, Material.FARMLAND, item.getType(), EFFICIENCY);
                             }
                         }
                     }
@@ -1235,7 +1261,7 @@ public class EnchantMoreListener implements Listener {
             so it will only work on blocks like grass (which does not break instantly). For 
             this reason, also allow right-click for grow, even though it means you cannot till.*/
             if (hasEnch(item, RESPIRATION, player)) {
-                if (plugin.canBuild(player, block, item.getTypeId(), RESPIRATION)) {
+                if (plugin.canBuild(player, block, item.getType(), RESPIRATION)) {
                     growStructure(block.getLocation(), player);
                     damage(item, player);
                 }
@@ -1247,7 +1273,7 @@ public class EnchantMoreListener implements Listener {
                 higher powers cut diagonal strip in direction facing
                 TODO: cut only in orthogonal directions? or only if in threshold?
                 TODO: or like BlastPick? 'clear your path' http://forums.bukkit.org/threads/edit-fun-blastpick-clear-your-path-1-1-rb.7007/ */
-                if (plugin.canBuild(player, block.getLocation(), item.getTypeId(), POWER)) {
+                if (plugin.canBuild(player, block.getLocation(), item.getType(), POWER)) {
                     int level = getLevel(item, POWER);
                     int dx = (int) Math.signum(block.getLocation().getX() - player.getLocation().getX()),
                             dy = (int) Math.signum(block.getLocation().getY() - player.getLocation().getY()),
@@ -1270,7 +1296,7 @@ public class EnchantMoreListener implements Listener {
         } else if (isAxe(item.getType())) {
             //Axe + Respiration = Generate Tree
             if (hasEnch(item, RESPIRATION, player)) {
-                if (plugin.canBuild(player, block.getLocation(), item.getTypeId(), RESPIRATION)) {
+                if (plugin.canBuild(player, block.getLocation(), item.getType(), RESPIRATION)) {
                     int n = getLevel(item, RESPIRATION);
                     if (n < 2 || n > 8) {
                         n = random.nextInt(7) + 2;
@@ -1308,7 +1334,7 @@ public class EnchantMoreListener implements Listener {
             if (hasEnch(item, FIRE_PROTECTION, player)) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, getLevel(item, FIRE_PROTECTION) * 20 * 5, 1));
             }
-        } else if (item.getTypeId() == SPAWN_EGG_ID) {
+        } else if (item.getType().getId() == SPAWN_EGG_ID) {
             if (item.getDurability() == EntityType.ENDER_CRYSTAL.getTypeId()) {
                 if (plugin.canBuild(player, block)) {
                     ItemStack fakeItem = new ItemStack(Material.DIAMOND_PICKAXE, 1); // since configured by item, have to fake it.. (like sublimateIce)
@@ -1319,7 +1345,7 @@ public class EnchantMoreListener implements Listener {
                         if (item.getAmount() == 1) {
                             player.setItemInHand(null);
                         } else {
-                            player.setItemInHand(new ItemStack(item.getTypeId(), item.getAmount() - 1, (short) EntityType.ENDER_CRYSTAL.getTypeId()));
+                            player.setItemInHand(new ItemStack(item.getType(), item.getAmount() - 1, (short) EntityType.ENDER_CRYSTAL.getTypeId()));
                         }
                     }
                 }
@@ -1374,7 +1400,7 @@ public class EnchantMoreListener implements Listener {
                     Creature bug = (Creature) entity;
                     // If at least 50% health, cut out eyes, then drop health
                     if (bug.getHealth() >= bug.getMaxHealth() / 2) {
-                        if (plugin.canDropItem(player, bug.getLocation(), item.getTypeId(), SILK_TOUCH)) {
+                        if (plugin.canDropItem(player, bug.getLocation(), item.getType(), SILK_TOUCH)) {
                             world.dropItemNaturally(bug.getEyeLocation(), new ItemStack(Material.SPIDER_EYE, 1));
                             bug.setHealth(bug.getMaxHealth() / 2 - 1);
                         }
@@ -1389,7 +1415,7 @@ public class EnchantMoreListener implements Listener {
 
                     // Pulling feathers damages the creature
                     if (bird.getHealth() >= bird.getMaxHealth() / 2) {
-                        if (plugin.canDropItem(player, bird.getLocation(), item.getTypeId(), SILK_TOUCH)) {
+                        if (plugin.canDropItem(player, bird.getLocation(), item.getType(), SILK_TOUCH)) {
                             world.dropItemNaturally(entity.getLocation(), new ItemStack(Material.FEATHER, random.nextInt(5) + 1));
                             // only can drop once (unless healed)
                             bird.setHealth(bird.getMaxHealth() / 2 - 1);
@@ -1402,7 +1428,7 @@ public class EnchantMoreListener implements Listener {
                 } else if (entity instanceof Cow) {
                     Creature bovine = (Creature) entity;
                     if (bovine.getHealth() >= bovine.getMaxHealth() / 2) {
-                        if (plugin.canDropItem(player, bovine.getLocation(), item.getTypeId(), SILK_TOUCH)) {
+                        if (plugin.canDropItem(player, bovine.getLocation(), item.getType(), SILK_TOUCH)) {
                             world.dropItemNaturally(entity.getLocation(), new ItemStack(Material.LEATHER, random.nextInt(5) + 1));
                             // can drop twice since cows are bigger
                             bovine.setHealth(bovine.getHealth() - bovine.getMaxHealth() / 3);
@@ -1413,7 +1439,7 @@ public class EnchantMoreListener implements Listener {
                     Pig piggy = (Pig) entity;
 
                     if (piggy.hasSaddle()) {
-                        if (plugin.canDropItem(player, piggy.getLocation(), item.getTypeId(), SILK_TOUCH)) {
+                        if (plugin.canDropItem(player, piggy.getLocation(), item.getType(), SILK_TOUCH)) {
                             world.dropItemNaturally(piggy.getLocation(), new ItemStack(Material.SADDLE, 1));
                             piggy.setSaddle(false);
                         }
@@ -1444,7 +1470,9 @@ public class EnchantMoreListener implements Listener {
                         // ..but, its an interesting effect, so its configurably allowed - "captured" players can't open chests, etc.
                         world.playEffect(entity.getLocation(), Effect.EXTINGUISH, 0);
                     } else {
-                        world.dropItemNaturally(entity.getLocation(), new ItemStack(Material.MONSTER_EGG, 1, type.getTypeId()));
+                        world.dropItemNaturally(entity.getLocation(), new ItemStack(Material.LEGACY_MONSTER_EGG, 1, type.getTypeId()));
+                        //TODO CORRECT THIS TO LOOKUP EGG TYPE PER ENTITY TYPE
+                        //Material.getMaterial(entity.getType().name()+"_SPAWN_EGG");
                         entity.remove();
                     }
                 }
@@ -1463,7 +1491,7 @@ public class EnchantMoreListener implements Listener {
                         // Knock item out of hand!
                         ItemStack drop = victim.getItemInHand();
                         if (drop != null && drop.getType() != Material.AIR) {
-                            if (plugin.canDropItem(player, victim.getLocation(), item.getTypeId(), SILK_TOUCH)) {
+                            if (plugin.canDropItem(player, victim.getLocation(), item.getType(), SILK_TOUCH)) {
                                 Location l = new Location(victim.getLocation().getWorld(), victim.getLocation().getX(), victim.getLocation().getY(), victim.getLocation().getZ());
                                 l.add(random.nextInt(getLevel(item, PUNCH) + 1), 0, random.nextInt(getLevel(item, PUNCH) + 1));
                                 world.dropItemNaturally(l, drop); // TODO: bigger variation?
@@ -1487,7 +1515,7 @@ public class EnchantMoreListener implements Listener {
                     if (roll <= level) {
                         // Pickpocket succeeded!
                         ItemStack[] pockets = victim.getInventory().getContents();
-                        if (plugin.canDropItem(player, victim.getLocation(), item.getTypeId(), SILK_TOUCH)) {
+                        if (plugin.canDropItem(player, victim.getLocation(), item.getType(), SILK_TOUCH)) {
                             for (int i = 0; i < pockets.length; i += 1) {    // TODO: choose random item?
                                 if (pockets[i] != null && pockets[i].getType() != Material.AIR) {
                                     // TODO: only drop one from stack?
@@ -1548,12 +1576,12 @@ public class EnchantMoreListener implements Listener {
             if (hasEnch(item, SILK_TOUCH, player)) {
                 if (getLevel(item, SILK_TOUCH) >= getConfigInt("minLevelCrystal", 3, item, SILK_TOUCH)) {
                     if (entity instanceof EnderCrystal) {
-                        if (plugin.canDropItem(player, entity.getLocation(), item.getTypeId(), SILK_TOUCH)) {
+                        if (plugin.canDropItem(player, entity.getLocation(), item.getType(), SILK_TOUCH)) {
                             short entityID = (short) entity.getType().getTypeId();
 
                             // drop a very special spawn egg
-                            entity.getLocation().getWorld().dropItemNaturally(entity.getLocation(), new ItemStack(SPAWN_EGG_ID, 1, entityID));
-
+                            entity.getLocation().getWorld().dropItemNaturally(entity.getLocation(), new ItemStack(Material.END_CRYSTAL, 1, entityID));
+                            //TODO IS THIS THE SAME THING?
                             entity.remove();
 
                             damage(item, player);
@@ -1634,7 +1662,7 @@ public class EnchantMoreListener implements Listener {
             // Shovel + Flame = [auto-smelt](http://dev.bukkit.org/server-mods/enchantmore/images/2-pickaxe-shovel-axe-flame-auto-smelt/)
             // Axe + Flame = [auto-smelt](http://dev.bukkit.org/server-mods/enchantmore/images/2-pickaxe-shovel-axe-flame-auto-smelt/)
             if (hasEnch(item, FLAME, player)) {
-                if (plugin.canBuild(player, block, item.getTypeId(), FLAME)) {
+                if (plugin.canBuild(player, block, item.getType(), FLAME)) {
                     Collection<ItemStack> rawDrops = block.getDrops(item);
 
                     boolean naturalDrop = true;
@@ -1644,7 +1672,7 @@ public class EnchantMoreListener implements Listener {
                         ItemStack smeltedDrop = smelt(rawDrop);
 
                         if (smeltedDrop != null && smeltedDrop.getType() != Material.AIR) {
-                            if (plugin.canDropItem(player, block, item.getTypeId(), FLAME)) {
+                            if (plugin.canDropItem(player, block, item.getType(), FLAME)) {
                                 world.dropItemNaturally(block.getLocation(), smeltedDrop);
                                 naturalDrop = false;
                             }
@@ -1663,13 +1691,13 @@ public class EnchantMoreListener implements Listener {
             if (isAxe(item.getType())) {
                 // Axe + Power = [fell tree](http://dev.bukkit.org/server-mods/enchantmore/images/3-axe-power-fell-tree/)
                 if (hasEnch(item, POWER, player)) {
-                    if (plugin.canBuild(player, block, item.getTypeId(), POWER)) {
+                    if (plugin.canBuild(player, block, item.getType(), POWER)) {
                         // is it a tree?
-                        int id1 = Material.LOG.getId();
-                        int id2 = getConfigInt("treeBlockId2", 143, item, POWER);   // RedPower2 Rubberwood
-                        int id3 = getConfigInt("treeBlockId3", 243, item, POWER);   // IC2 Rubber Wood
-
-                        if (block.getTypeId() == id1 || block.getTypeId() == id2 || block.getTypeId() == id3) {
+                        Material id1 = Material.OAK_LOG;
+                        Material id2 = Material.OAK_LOG;
+                        Material id3 = Material.OAK_LOG;
+                        //TODO ADD OTHER LOGS
+                        if (block.getType() == id1) {
                             fellTree(player, block, item, getLevel(item, POWER) * getConfigInt("extraTrunkWidthPerLevel", 1, item, POWER), id1, id2, id3);
                             event.setCancelled(true);
                             // no extra damage
@@ -1681,7 +1709,7 @@ public class EnchantMoreListener implements Listener {
             if (isShovel(item.getType())) {
                 // Shovel + Power = excavation (dig large area, no drops)
                 if (hasEnch(item, POWER, player) && isExcavatable(block.getType())) {
-                    if (plugin.canBuild(player, block, item.getTypeId(), POWER)) {
+                    if (plugin.canBuild(player, block, item.getType(), POWER)) {
                         // Clear out those annoying veins of gravel (or dirt)
 
                         // Dig a cube out, but no drops
@@ -1698,7 +1726,7 @@ public class EnchantMoreListener implements Listener {
                                 for (int dz = -r; dz <= r; dz += 1) {
                                     int x = dx + x0, y = dy + y0, z = dz + z0;
 
-                                    int type = world.getBlockTypeIdAt(x, y, z);
+                                    Material type = world.getBlockAt(x, y, z).getType();
                                     if (isExcavatable(type)) {
                                         Block b = world.getBlockAt(x, y, z);
                                         plugin.safeSetBlock(player, b, Material.AIR);
@@ -1717,7 +1745,7 @@ public class EnchantMoreListener implements Listener {
                 // Shovel + Silk Touch II = harvest fallen snow, fire
                 // (fire elsewhere)
                 if (hasEnch(item, SILK_TOUCH, player)) {
-                    if (plugin.canBuild(player, block, item.getTypeId(), SILK_TOUCH) && plugin.canDropItem(player, block, item.getTypeId(), SILK_TOUCH)) {
+                    if (plugin.canBuild(player, block, item.getType(), SILK_TOUCH) && plugin.canDropItem(player, block, item.getType(), SILK_TOUCH)) {
                         int minLevel = getConfigInt("minLevel", 2, item, SILK_TOUCH);
                         if (getLevel(item, SILK_TOUCH) >= minLevel) {
                             if (block.getType() == Material.SNOW) {
@@ -1734,7 +1762,7 @@ public class EnchantMoreListener implements Listener {
             if (isPickaxe(item.getType())) {
                 // Pickaxe + Silk Touch II = harvest ice, double slabs, silverfish blocks
                 if (hasEnch(item, SILK_TOUCH, player)) {
-                    if (plugin.canBuild(player, block, item.getTypeId(), SILK_TOUCH) && plugin.canDropItem(player, block, item.getTypeId(), SILK_TOUCH)) {
+                    if (plugin.canBuild(player, block, item.getType(), SILK_TOUCH) && plugin.canDropItem(player, block, item.getType(), SILK_TOUCH)) {
                         int minLevel = getConfigInt("minLevel", 2, item, SILK_TOUCH);
                         if (getLevel(item, SILK_TOUCH) >= minLevel) {
                             if (block.getType() == Material.ICE) {
@@ -1746,7 +1774,7 @@ public class EnchantMoreListener implements Listener {
                                     event.setCancelled(true);
                                     // no extra damage
                                 }
-                            } else if (block.getType() == Material.DOUBLE_STEP) {
+                            } else if (block.getType() == Material.LEGACY_DOUBLE_STEP) {
                                 if (getConfigBoolean("harvestDoubleSlabs", true, item, SILK_TOUCH)) {
                                     ItemStack drop = new ItemStack(block.getType(), 1, (short) block.getData());
 
@@ -1760,7 +1788,7 @@ public class EnchantMoreListener implements Listener {
                                     }
                                     event.setCancelled(true);
                                 }
-                            } else if (block.getTypeId() == 97) {   // Bukkit Material calls this MONSTER_EGGS, but I'm not going to call it that!
+                            } else if (block.getType() == Material.LEGACY_MONSTER_EGGS) {   // Bukkit Material calls this MONSTER_EGGS, but I'm not going to call it that!
                                 if (getConfigBoolean("harvestSilverfishBlocks", true, item, SILK_TOUCH)) {
                                     ItemStack drop = new ItemStack(block.getType(), 1, (short) block.getData());
 
@@ -1785,7 +1813,7 @@ public class EnchantMoreListener implements Listener {
                 if (hasEnch(item, LOOTING, player)) {
                     // partly inspired by Advanced Shears' bookshelves/ladders/jackolatern/stickypiston disassembling
                     // http://forums.bukkit.org/threads/edit-fun-misc-advancedshears-v-1-3-cut-through-more-blocks-and-mobs-953-1060.24746/
-                    if (plugin.canDropItem(player, block, item.getTypeId(), LOOTING)) {
+                    if (plugin.canDropItem(player, block, item.getType(), LOOTING)) {
                         Collection<ItemStack> finishedDrops = block.getDrops(item);
                         boolean naturalDrop = true;
                         for (ItemStack finishedDrop : finishedDrops) {
@@ -1822,24 +1850,26 @@ public class EnchantMoreListener implements Listener {
 
                 // Pickaxe + Sharpness = mine ore vein
                 if (hasEnch(item, SHARPNESS, player)) {
-                    if (plugin.canBuild(player, block, item.getTypeId(), SHARPNESS)) {
-                        int oreId = block.getTypeId();
+                    if (plugin.canBuild(player, block, item.getType(), SHARPNESS)) {
+                        Material oreId = block.getType();
 
-                        if (oreId == 74) {
-                            oreId = 73;
+                        if (oreId == Material.LEGACY_GLOWING_REDSTONE_ORE) {
+                            oreId = Material.REDSTONE_ORE;
                         }
 
                         byte oreData = block.getData();
 
                         boolean defaultValue = false;
                         switch (oreId) {
-                            case 14:    // Gold Ore
-                            case 15:    // Iron ore
-                            case 16:    // Coal Ore
-                            case 21:    // Lapis Lazuli Ore
-                            case 56:    // Diamond Ore
-                            case 73:    // Redstone Ore
-                            case 74:    // Glowing Redstone Ore // TODO: fix bug, if only partly glowing won't mine all!
+                            case GOLD_ORE:    // Gold Ore
+                            case IRON_ORE:    // Iron ore
+                            case COAL_ORE:    // Coal Ore
+                            case LAPIS_ORE:    // Lapis Lazuli Ore
+                            case DIAMOND_ORE:    // Diamond Ore
+                            case REDSTONE_ORE:    // Redstone Ore
+                            case LEGACY_GLOWING_REDSTONE_ORE:    // Glowing Redstone Ore // TODO: fix bug, if only partly glowing won't mine all!
+                            case EMERALD_ORE:
+                            case NETHER_QUARTZ_ORE:
                                 defaultValue = true;
                         }
 
@@ -1855,8 +1885,8 @@ public class EnchantMoreListener implements Listener {
                                     for (int dz = -r; dz <= r; dz += 1) {
                                         int x = dx + x0, y = dy + y0, z = dz + z0;
 
-                                        int type = world.getBlockTypeIdAt(x, y, z);
-                                        if (type == oreId) {
+                                        Block type = world.getBlockAt(x, y, z);
+                                        if (type.getType() == oreId) {
                                             Block b = world.getBlockAt(x, y, z);
                                             if (b.getData() == oreData) {
                                                 Collection<ItemStack> drops = b.getDrops(item);
@@ -1864,7 +1894,7 @@ public class EnchantMoreListener implements Listener {
                                                     for (ItemStack drop : drops) {
                                                         // drop all at _central_ location of original block breakage!
                                                         // so this effect can be useful to gather diamonds over dangerous lava
-                                                        if (plugin.canDropItem(player, block, item.getTypeId(), SHARPNESS)) {
+                                                        if (plugin.canDropItem(player, block, item.getType(), SHARPNESS)) {
                                                             world.dropItemNaturally(block.getLocation(), drop);
                                                             plugin.getServer().getPluginManager().callEvent(new BlockBreakEvent(block, player));
                                                         }
@@ -1885,9 +1915,9 @@ public class EnchantMoreListener implements Listener {
             if (hasEnch(item, SILK_TOUCH, player)) {
                 // Note: you can collect dead bush with shears on 12w05a!
                 // http://www.reddit.com/r/Minecraft/comments/pc2rs/just_noticed_dead_bush_can_be_collected_with/
-                if (plugin.canBuild(player, block, item.getTypeId(), SILK_TOUCH)) {
+                if (plugin.canBuild(player, block, item.getType(), SILK_TOUCH)) {
                     if (block.getType() == Material.DEAD_BUSH ||
-                            block.getType() == Material.WEB) {
+                            block.getType() == Material.COBWEB) {
 
                         world.dropItemNaturally(block.getLocation(), new ItemStack(block.getType(), 1));
 
@@ -1902,8 +1932,9 @@ public class EnchantMoreListener implements Listener {
 
             // Shears + Fortune = apples from leaves
             if (hasEnch(item, FORTUNE, player)) {
-                if (block.getType() == Material.LEAVES) {
-                    if (plugin.canBuild(player, block, item.getTypeId(), FORTUNE) && plugin.canDropItem(player, block, item.getTypeId(), FORTUNE)) {
+                if (block.getType() == Material.LEGACY_LEAVES) {
+                    //TODO SETUP WITH OTHER LEAVES
+                    if (plugin.canBuild(player, block, item.getType(), FORTUNE) && plugin.canDropItem(player, block, item.getType(), FORTUNE)) {
                         Material dropType;
 
                         // TODO: different probabilities, depending on level too (higher, more golden)
@@ -1928,10 +1959,10 @@ public class EnchantMoreListener implements Listener {
 
             // Shears + Power = hedge trimmer/builder; cut grass
             // see also secondary effect above
-            if (hasEnch(item, POWER, player) && block.getType() == Material.LEAVES) {
-                if (plugin.canBuild(player, block, item.getTypeId(), POWER)) {
+            if (hasEnch(item, POWER, player) && block.getType() == Material.LEGACY_LEAVES) {//TODO SETUP TO USE MULTIPLE LEAVES
+                if (plugin.canBuild(player, block, item.getType(), POWER)) {
                     event.setCancelled(true);
-                    hedgeTrimmer(player, block, item, getLevel(item, POWER), item.getTypeId(), POWER);
+                    hedgeTrimmer(player, block, item, getLevel(item, POWER), item.getType(), POWER);
                     // no extra damage
                 }
             }
@@ -1939,7 +1970,7 @@ public class EnchantMoreListener implements Listener {
         } else if (isHoe(item.getType())) {
             // Hoe + Silk Touch = collect farmland, crop block, pumpkin/melon stem, cake block, sugarcane block, netherwart block (preserving data)
             if (hasEnch(item, SILK_TOUCH, player)) {
-                if (plugin.canBuild(player, block, item.getTypeId(), SILK_TOUCH) && plugin.canDropItem(player, block, item.getTypeId(), SILK_TOUCH)) {
+                if (plugin.canBuild(player, block, item.getType(), SILK_TOUCH) && plugin.canDropItem(player, block, item.getType(), SILK_TOUCH)) {
                     // Collect farm-related blocks, preserving the growth/wetness/eaten data
                     if (isFarmBlock(block.getType())) {
                         ItemStack drop = new ItemStack(block.getType(), 1);
@@ -1972,14 +2003,21 @@ public class EnchantMoreListener implements Listener {
         }
         // Item to place as a block
         // NOT event.getItemInHand(), see https://bukkit.atlassian.net/browse/BUKKIT-596 BlockPlaceEvent getItemInHand() loses enchantments
-        ItemStack item = player.getItemInHand();
+        ItemStack item = player.getInventory().getItemInMainHand();
 
         // Set data of farm-related block
         if (item != null && hasEnch(item, SILK_TOUCH, player)) {
             if (isFarmBlock(item.getType())) {
                 // Make sure we get data from item, not through hasEnch since not player-related
                 if (item.containsEnchantment(SILK_TOUCH)) {
-                    block.setData((byte) item.getEnchantmentLevel(SILK_TOUCH));
+                    block.setType(item.getType());
+                    BlockData state = block.getState().getBlockData();
+                    if (state instanceof Farmland) {
+                        Farmland w = (Farmland) state;
+                        w.setMoisture(w.getMaximumMoisture());
+                    } else {
+                        //not leaves...
+                    }
                 }
             }
         }
@@ -2007,10 +2045,10 @@ public class EnchantMoreListener implements Listener {
                     // Workaround type not changing, until fix is in a build:
                     // "Allow plugins to change ID and Data during BlockPlace event." Fixes BUKKIT-674
                     // https://github.com/Bukkit/CraftBukkit/commit/f29b84bf1579cf3af31ea3be6df0bc8917c1de0b
+                    Bukkit.getScheduler().scheduleSyncDelayedTask(plugin,new EnchantMoreChangeMaterialTask(block, player, Material.AIR, this));
 
-                    Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, new EnchantMoreChangeMaterialTask(block, player, Material.AIR, this));
                 }
-            } else if (block.getType() == Material.DOUBLE_STEP) {
+            } else if (block.getType() == Material.LEGACY_DOUBLE_STEP) {
                 ItemStack fakeItem = new ItemStack(Material.DIAMOND_PICKAXE, 1);
                 boolean shouldSetData = getConfigBoolean("placeDoubleSlabs", true, fakeItem, SILK_TOUCH);
                 if (shouldSetData) {
@@ -2020,12 +2058,18 @@ public class EnchantMoreListener implements Listener {
                         data = item.getEnchantmentLevel(SILK_TOUCH);
                     }
 
-                    block.setData((byte) data);
-
+                   // block.setData((byte) data);
+                    block.setType(item.getType());
+                    BlockData state = block.getState().getBlockData();
+                    if (state instanceof Slab) {
+                        Slab w = (Slab) state;
+                        w.setType(Slab.Type.DOUBLE);
+                    } else {
+                        //not slab...
+                    }
                     // Oddly, if delay and change, then it will take effect but texture won't be updated. Have to set now ^
-                    //Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, new EnchantMoreChangeMaterialTask(block, player, Material.DOUBLE_STEP, data, this));
-                }
-            } else if (block.getTypeId() == 97) {
+                     }
+            } else if (block.getType() ==Material.LEGACY_MONSTER_EGG) {
                 // Silverfish blocks, restore data, same as double slabs
                 ItemStack fakeItem = new ItemStack(Material.DIAMOND_PICKAXE, 1);
                 boolean shouldSetData = getConfigBoolean("placeSilverfishBlocks", true, fakeItem, SILK_TOUCH);
@@ -2035,7 +2079,8 @@ public class EnchantMoreListener implements Listener {
                         data = item.getEnchantmentLevel(SILK_TOUCH);
                     }
 
-                    block.setData((byte) data);
+                   // block.setData((byte) data);
+                    //TODO DOES THIS WORK WITHOUT THE SET DATA?
                 }
 
             }
@@ -2066,8 +2111,9 @@ public class EnchantMoreListener implements Listener {
             int quantity = random.nextInt(getLevel(tool, LOOTING) * 2);
             for (int i = 0; i < quantity; i += 1) {
                 short color = (short) random.nextInt(16);
-                if (plugin.canDropItem(player, loc, tool.getTypeId(), LOOTING)) {
-                    world.dropItemNaturally(entity.getLocation(), new ItemStack(Material.WOOL, 1, color));
+                if (plugin.canDropItem(player, loc, tool.getType(), LOOTING)) {
+                    world.dropItemNaturally(entity.getLocation(), new ItemStack(Material.LEGACY_WOOL, 1, color));
+                    //TODO DO OTHER WOOLS
                 }
             }
             // no extra damage
@@ -2114,7 +2160,7 @@ public class EnchantMoreListener implements Listener {
 
 
                     for (int i = 0; i < itemStack.getAmount(); i += 1) {
-                        if (itemStack.getTypeId() == SPAWN_EGG_ID && getConfigBoolean("allowSpawnEgg", true, bow, RESPIRATION)) {
+                        if (itemStack.getType().getId() == SPAWN_EGG_ID && getConfigBoolean("allowSpawnEgg", true, bow, RESPIRATION)) {
                             // Spawn Egg = creature
                             int entityId = itemStack.getData().getData();
 
@@ -2136,7 +2182,7 @@ public class EnchantMoreListener implements Listener {
                             float speed = 0.6f;
                             float spread = 12f;
                             world.spawnArrow(dest, velocity, speed, spread);
-                        } else if (itemStack.getType() == Material.SNOW_BALL && getConfigBoolean("allowSnowball", true, bow, RESPIRATION)) {
+                        } else if (itemStack.getType() == Material.SNOWBALL && getConfigBoolean("allowSnowball", true, bow, RESPIRATION)) {
                             world.spawn(dest, Snowball.class);
                         } else if (itemStack.getType() == Material.EGG && getConfigBoolean("allowEgg", true, bow, RESPIRATION)) {
                             world.spawn(dest, Egg.class);
@@ -2148,7 +2194,7 @@ public class EnchantMoreListener implements Listener {
                             // water bucket, spill and leave empty bucket
                             if (dest.getBlock() == null || dest.getBlock().getType() == Material.AIR) {
                                 if (plugin.safeSetBlock(player, dest.getBlock(), Material.WATER)) {
-                                    if (plugin.canDropItem(player, dest, bow.getTypeId(), RESPIRATION)) {
+                                    if (plugin.canDropItem(player, dest, bow.getType(), RESPIRATION)) {
                                         world.dropItem(dest, new ItemStack(Material.BUCKET, 1));
                                     }
                                 }
@@ -2157,7 +2203,7 @@ public class EnchantMoreListener implements Listener {
                             // lava bucket, same
                             if (dest.getBlock() == null || dest.getBlock().getType() == Material.AIR) {
                                 if (plugin.safeSetBlock(player, dest.getBlock(), Material.LAVA)) {
-                                    if (plugin.canDropItem(player, dest, bow.getTypeId(), RESPIRATION)) {
+                                    if (plugin.canDropItem(player, dest, bow.getType(), RESPIRATION)) {
                                         world.dropItem(dest, new ItemStack(Material.BUCKET, 1));    // probably will be destroyed, but whatever
                                     }
                                 }
@@ -2179,7 +2225,7 @@ public class EnchantMoreListener implements Listener {
                         } else if (itemStack.getType().isBlock() && getConfigBoolean("allowBlock", true, bow, RESPIRATION)) {
                             // Blocks = build
                             // TODO: better building than straight up vertical columns? build around?
-                            if (plugin.canBuild(player, dest, bow.getTypeId(), RESPIRATION)) {
+                            if (plugin.canBuild(player, dest, bow.getType(), RESPIRATION)) {
                                 Block build = dest.getBlock().getRelative(0, i, 0);
 
                                 if (build.getType() == Material.AIR) {
@@ -2233,7 +2279,7 @@ public class EnchantMoreListener implements Listener {
 
         // Bow + Smite = strike lightning
         if (hasEnch(bow, SMITE, player)) {
-            if (plugin.canStrikeLightning(player, dest, bow.getTypeId(), SMITE)) {
+            if (plugin.canStrikeLightning(player, dest, bow.getType(), SMITE)) {
                 world.strikeLightning(dest);
             }
         }
@@ -2241,14 +2287,14 @@ public class EnchantMoreListener implements Listener {
         // Bow + Fire Aspect = [firey explosions](http://dev.bukkit.org/server-mods/enchantmore/images/5-bow-fire-aspect-fiery-explosions/)
         if (hasEnch(bow, FIRE_ASPECT, player)) {
             float power = (float) (getConfigDouble("powerPerLevel", 1.0, bow, FIRE_ASPECT)) * getLevel(bow, FIRE_ASPECT);
-            if (plugin.canExplode(player, dest, bow.getTypeId(), FIRE_ASPECT)) {
+            if (plugin.canExplode(player, dest, bow.getType(), FIRE_ASPECT)) {
                 world.createExplosion(dest, power, true);
             }
         }
 
         // Bow + Aqua Affinity = freeze water, stun players
         if (hasEnch(bow, AQUA_AFFINITY, player)) {
-            if (plugin.canBuild(player, dest, bow.getTypeId(), AQUA_AFFINITY)) {
+            if (plugin.canBuild(player, dest, bow.getType(), AQUA_AFFINITY)) {
                 //TODO: Doesn't work when it hits the ocean :(
                 int r = getLevel(bow, AQUA_AFFINITY);
 
@@ -2263,7 +2309,7 @@ public class EnchantMoreListener implements Listener {
                         for (int dz = -freezeRange; dz <= freezeRange; dz += 1) {
                             Block b = world.getBlockAt(dx + x0, dy + y0, dz + z0);
 
-                            if (b.getType() == Material.STATIONARY_WATER || b.getType() == Material.WATER) {
+                            if (b.getType() == Material.LEGACY_STATIONARY_WATER || b.getType() == Material.WATER) {
                                 b.setType(Material.ICE);
                             }
                         }
@@ -2272,7 +2318,7 @@ public class EnchantMoreListener implements Listener {
 
                 // TODO: only poison hit entity!
 
-                if (plugin.canPVP(player, arrow.getLocation(), bow.getTypeId(), AQUA_AFFINITY)) {
+                if (plugin.canPVP(player, arrow.getLocation(), bow.getType(), AQUA_AFFINITY)) {
                     double stunRange = r * getConfigDouble("stunRangePerLevel", 1.0, bow, AQUA_AFFINITY);
 
                     // stun nearby living things
@@ -2292,7 +2338,7 @@ public class EnchantMoreListener implements Listener {
 
         // Bow + Knockback = pierce blocks
         if (hasEnch(bow, KNOCKBACK, player)) {
-            if (plugin.canBuild(player, dest, bow.getTypeId(), KNOCKBACK)) {
+            if (plugin.canBuild(player, dest, bow.getType(), KNOCKBACK)) {
                 class ArrowPierceTask implements Runnable {
                     Arrow arrow;
                     int depth;
@@ -2345,7 +2391,7 @@ public class EnchantMoreListener implements Listener {
 
         // Bow + Bane of Arthropods = poison
         if (hasEnch(bow, BANE_OF_ARTHROPODS, player)) {
-            if (plugin.canPVP(player, arrow.getLocation(), bow.getTypeId(), BANE_OF_ARTHROPODS)) {
+            if (plugin.canPVP(player, arrow.getLocation(), bow.getType(), BANE_OF_ARTHROPODS)) {
                 // TODO: only poison hit entity!
 
                 // poison nearby living things
@@ -2413,6 +2459,7 @@ public class EnchantMoreListener implements Listener {
     public void onPlayerFish(PlayerFishEvent event) {
         Player player = event.getPlayer();
         ItemStack item = player.getItemInHand();
+
         if (item == null) {
             return;
         }
@@ -2441,7 +2488,7 @@ public class EnchantMoreListener implements Listener {
 
             // Fishing Rod + Smite = strike mobs with lightning
             if (hasEnch(item, SMITE, player)) {
-                if (plugin.canStrikeLightning(player, entity.getLocation(), item.getTypeId(), SMITE)) {
+                if (plugin.canStrikeLightning(player, entity.getLocation(), item.getType(), SMITE)) {
                     world.strikeLightning(entity.getLocation());
                     damage(item, player);
                 }
@@ -2460,25 +2507,27 @@ public class EnchantMoreListener implements Listener {
         } else if (state == PlayerFishEvent.State.CAUGHT_FISH) {
             // Fishing Rod + Flame = catch cooked fish
             if (hasEnch(item, FLAME, player)) {
-                if (plugin.canDropItem(player, player.getLocation(), item.getTypeId(), FLAME)) {
+                if (plugin.canDropItem(player, player.getLocation(), item.getType(), FLAME)) {
                     event.setCancelled(true);
 
                     // replace raw with cooked (TODO: play well with all other enchantments)
-                    world.dropItemNaturally(player.getLocation(), new ItemStack(Material.COOKED_FISH, 1));
+                    world.dropItemNaturally(player.getLocation(), new ItemStack(Material.LEGACY_COOKED_FISH, 1));
+                    //TODO SETUP OTHER FISH
                 }
             }
 
             // Fishing Rod + Looting = catch extra fish
             if (hasEnch(item, LOOTING, player)) {
-                if (plugin.canDropItem(player, player.getLocation(), item.getTypeId(), FLAME)) {
+                if (plugin.canDropItem(player, player.getLocation(), item.getType(), FLAME)) {
                     // one extra per level
-                    world.dropItemNaturally(player.getLocation(), new ItemStack(Material.RAW_FISH, getLevel(item, FORTUNE)));
+                    world.dropItemNaturally(player.getLocation(), new ItemStack(Material.LEGACY_RAW_FISH, getLevel(item, FORTUNE)));
+                    //TODO SETUP OTHER FISH
                 }
             }
 
             // Fishing Rod + Fortune = [catch junk](http://dev.bukkit.org/server-mods/enchantmore/images/7-fishing-rod-fortune-catch-sunken-treasure/)
             if (hasEnch(item, FORTUNE, player)) {
-                if (plugin.canDropItem(player, player.getLocation(), item.getTypeId(), FORTUNE)) {
+                if (plugin.canDropItem(player, player.getLocation(), item.getType(), FORTUNE)) {
                     int quantity = getLevel(item, FORTUNE);
 
                     Material m;
@@ -2486,7 +2535,7 @@ public class EnchantMoreListener implements Listener {
                     // TODO: configurable, like Junkyard Creek http://dev.bukkit.org/server-mods/junkyardcreek/
                     switch (random.nextInt(19)) {
                         case 0:
-                            m = Material.MONSTER_EGGS;
+                            m = Material.LEGACY_MONSTER_EGGS;
                             break;       // hidden silverfish block
                         case 1:
                         default:
@@ -2495,7 +2544,7 @@ public class EnchantMoreListener implements Listener {
                             break;
                         case 3:
                         case 4:
-                            m = Material.WOOD;
+                            m = Material.LEGACY_WOOD;//TODO ADD OTHER WOODS
                             break;
                         case 5:
                             m = Material.SPONGE;
@@ -2504,7 +2553,7 @@ public class EnchantMoreListener implements Listener {
                             m = Material.DEAD_BUSH;
                             break;
                         case 7:
-                            m = Material.EYE_OF_ENDER;
+                            m = Material.ENDER_EYE;
                             break;
                         case 8:
                             m = Material.DIAMOND;
@@ -2526,7 +2575,7 @@ public class EnchantMoreListener implements Listener {
                             m = Material.WATER_BUCKET;
                             break;
                         case 17:
-                            m = Material.BOAT;
+                            m = Material.LEGACY_BOAT;//TODO ADD OTHER BOATS
                             break;
                         case 18:
                             m = Material.SLIME_BALL;
@@ -2547,7 +2596,7 @@ public class EnchantMoreListener implements Listener {
         } else if (state == PlayerFishEvent.State.FAILED_ATTEMPT) {
             // Fishing Rod + Silk Touch = catch more reliably
             if (hasEnch(item, SILK_TOUCH, player)) {
-                if (plugin.canDropItem(player, player.getLocation(), item.getTypeId(), SILK_TOUCH)) {
+                if (plugin.canDropItem(player, player.getLocation(), item.getType(), SILK_TOUCH)) {
                     // probability
                     // TODO: configurable levels, maybe to 100?
                     // 4 = always
@@ -2558,7 +2607,7 @@ public class EnchantMoreListener implements Listener {
 
                     if (random.nextInt(n) == 0) {
                         // TODO: integrate with Flame to catch cooked, too
-                        world.dropItemNaturally(player.getLocation(), new ItemStack(Material.RAW_FISH, 1));
+                        world.dropItemNaturally(player.getLocation(), new ItemStack(Material.LEGACY_RAW_FISH, 1));
                     }
                 }
             }
@@ -2665,13 +2714,13 @@ public class EnchantMoreListener implements Listener {
     public Block getArrowHit(Arrow arrow) {
         World world = arrow.getWorld();
 
-        net.minecraft.server.v1_7_R2.EntityArrow entityArrow = ((CraftArrow) arrow).getHandle();
+        net.minecraft.server.v1_14_R1.EntityArrow entityArrow = ((CraftArrow) arrow).getHandle();
 
         try {
             // saved to NBT tag as xTile,yTile,zTile
-            Field fieldX = net.minecraft.server.v1_7_R2.EntityArrow.class.getDeclaredField("d");
-            Field fieldY = net.minecraft.server.v1_7_R2.EntityArrow.class.getDeclaredField("e");
-            Field fieldZ = net.minecraft.server.v1_7_R2.EntityArrow.class.getDeclaredField("f");
+            Field fieldX = net.minecraft.server.v1_14_R1.EntityArrow.class.getDeclaredField("d");
+            Field fieldY = net.minecraft.server.v1_14_R1.EntityArrow.class.getDeclaredField("e");
+            Field fieldZ = net.minecraft.server.v1_14_R1.EntityArrow.class.getDeclaredField("f");
 
             fieldX.setAccessible(true);
             fieldY.setAccessible(true);
@@ -2688,11 +2737,11 @@ public class EnchantMoreListener implements Listener {
         }
     }
 
-    public int getArrowFromPlayer(Arrow arrow) {
+    public EntityArrow.PickupStatus getArrowFromPlayer(Arrow arrow) {
         return (((CraftArrow) arrow).getHandle()).fromPlayer;
     }
 
-    public void setArrowFromPlayer(Arrow arrow, int fromPlayer) {
+    public void setArrowFromPlayer(Arrow arrow, EntityArrow.PickupStatus fromPlayer) {
         (((CraftArrow) arrow).getHandle()).fromPlayer = fromPlayer;
     }
 
@@ -2708,7 +2757,7 @@ public class EnchantMoreListener implements Listener {
             //Chestplate + Fish Mode = No damage from drowning
             if (hasEnch(chestplate, RESPIRATION, player)) {
                 Block blockIn = player.getEyeLocation().getBlock(); //Now checks if player is actually swimming, rather than just standing in the water.
-                if (blockIn.getType() == Material.STATIONARY_WATER || blockIn.getType() == Material.WATER) {
+                if (blockIn.getType() == Material.LEGACY_STATIONARY_WATER || blockIn.getType() == Material.WATER) {
                     if (event.getCause() == DamageCause.DROWNING) { //Check if the damage is actually from drowning
                         damage(chestplate, event.getDamage() / 2, player);
                         player.getInventory().setChestplate((chestplate.getDurability() > chestplate.getType().getMaxDurability() ? null : chestplate));

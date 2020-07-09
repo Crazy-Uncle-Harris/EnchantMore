@@ -116,174 +116,174 @@ public class EnchantMore extends JavaPlugin {
 > what would you recommend in the meantime?
 <zml2008>  Using WG's API
 */
-    public boolean canPVP(Player player, Block block, int itemId, Enchantment ench) { //Check if WorldGuard allows lightning
+    public boolean canPVP(Player player, Block block, Material material, Enchantment ench) { //Check if WorldGuard allows lightning
         if (wg != null) {
             World world = block.getWorld();
             Location loc = block.getLocation();
             RegionManager regionManager = wg.getRegionManager(world);
             ApplicableRegionSet set = regionManager.getApplicableRegions(loc);
             if (!set.allows(DefaultFlag.PVP)) {
-                int packed = EnchantMoreListener.packEnchItem(itemId, ench);
+                String packed = EnchantMoreListener.packEnchItem(material, ench);
                 if (verboseLogger()) {
-                    this.getLogger().info("Effect " + Material.getMaterial(itemId) + "(" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                    this.getLogger().info("Effect " + material.name() + " + " + ench + " = " + packed + " blocked by WorldGuard.");
                 }
-                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + Material.getMaterial(itemId) + " (" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " +material.name() + " + " + ench + " = " + packed + " blocked by WorldGuard.");
             }
             return set.allows(DefaultFlag.PVP);
         }
         return true;
     }
 
-    public boolean canPVP(Player player, Location loc, int itemId, Enchantment ench) { //Check if WorldGuard allows lightning
+    public boolean canPVP(Player player, Location loc, Material material, Enchantment ench) { //Check if WorldGuard allows lightning
         if (wg != null) {
             World world = loc.getWorld();
             RegionManager regionManager = wg.getRegionManager(world);
             ApplicableRegionSet set = regionManager.getApplicableRegions(loc);
             if (!set.allows(DefaultFlag.PVP)) {
-                int packed = EnchantMoreListener.packEnchItem(itemId, ench);
+                String packed = EnchantMoreListener.packEnchItem(material, ench);
                 if (verboseLogger()) {
-                    this.getLogger().info("Effect " + Material.getMaterial(itemId) + "(" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                    this.getLogger().info("Effect " + material.name()  + " + " + ench + " = " + packed + " blocked by WorldGuard.");
                 }
-                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + Material.getMaterial(itemId) + " (" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + material.name() + " + " + ench + " = " + packed + " blocked by WorldGuard.");
             }
             return set.allows(DefaultFlag.PVP);
         }
         return true;
     }
 
-    public boolean canStrikeLightning(Player player, Block block, int itemId, Enchantment ench) { //Check if WorldGuard allows lightning
+    public boolean canStrikeLightning(Player player, Block block, Material material, Enchantment ench) { //Check if WorldGuard allows lightning
         if (wg != null) {
             World world = block.getWorld();
             Location loc = block.getLocation();
             RegionManager regionManager = wg.getRegionManager(world);
             ApplicableRegionSet set = regionManager.getApplicableRegions(loc);
             if (!set.allows(DefaultFlag.LIGHTNING)) {
-                int packed = EnchantMoreListener.packEnchItem(itemId, ench);
+                String packed = EnchantMoreListener.packEnchItem(material, ench);
                 if (verboseLogger()) {
-                    this.getLogger().info("Effect " + Material.getMaterial(itemId) + "(" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                    this.getLogger().info("Effect " + material.name()  + " + " + ench + " = " + packed + " blocked by WorldGuard.");
                 }
-                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + Material.getMaterial(itemId) + " (" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " +material.name() + " + " + ench + " = " + packed + " blocked by WorldGuard.");
             }
             return set.allows(DefaultFlag.LIGHTNING);
         }
         return true;
     }
 
-    public boolean canStrikeLightning(Player player, Location loc, int itemId, Enchantment ench) { //Check if WorldGuard allows lightning
+    public boolean canStrikeLightning(Player player, Location loc, Material material, Enchantment ench) { //Check if WorldGuard allows lightning
         if (wg != null) {
             World world = loc.getWorld();
             RegionManager regionManager = wg.getRegionManager(world);
             ApplicableRegionSet set = regionManager.getApplicableRegions(loc);
             if (!set.allows(DefaultFlag.LIGHTNING)) {
-                int packed = EnchantMoreListener.packEnchItem(itemId, ench);
+                String packed = EnchantMoreListener.packEnchItem(material, ench);
                 if (verboseLogger()) {
-                    this.getLogger().info("Effect " + Material.getMaterial(itemId) + "(" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                    this.getLogger().info("Effect " + material.name()  + " + " + ench + " = " + packed + " blocked by WorldGuard.");
                 }
-                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + Material.getMaterial(itemId) + " (" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + material.name() + " + " + ench + " = " + packed + " blocked by WorldGuard.");
             }
             return set.allows(DefaultFlag.LIGHTNING);
         }
         return true;
     }
 
-    public boolean canExplode(Player player, Block block, int itemId, Enchantment ench) { //Check if WorldGuard allows an explosion at a location
+    public boolean canExplode(Player player, Block block, Material material, Enchantment ench) { //Check if WorldGuard allows an explosion at a location
         if (wg != null) {
             World world = block.getWorld();
             Location loc = block.getLocation();
             RegionManager regionManager = wg.getRegionManager(world);
             ApplicableRegionSet set = regionManager.getApplicableRegions(loc);
             if (!(set.allows(DefaultFlag.OTHER_EXPLOSION))) {
-                int packed = EnchantMoreListener.packEnchItem(itemId, ench);
+                String packed = EnchantMoreListener.packEnchItem(material, ench);
                 if (verboseLogger()) {
-                    this.getLogger().info("Effect " + Material.getMaterial(itemId) + "(" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                    this.getLogger().info("Effect " + material.name() + " + " + ench + " = " + packed + " blocked by WorldGuard.");
                 }
-                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + Material.getMaterial(itemId) + " (" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " +material.name() +" + " + ench + " = " + packed + " blocked by WorldGuard.");
             }
             return set.allows(DefaultFlag.OTHER_EXPLOSION);
         }
         return true;
     }
 
-    public boolean canExplode(Player player, Location loc, int itemId, Enchantment ench) { //Check if WorldGuard allows an explosion at a location
+    public boolean canExplode(Player player, Location loc, Material material, Enchantment ench) { //Check if WorldGuard allows an explosion at a location
         if (wg != null) {
             World world = loc.getWorld();
             RegionManager regionManager = wg.getRegionManager(world);
             ApplicableRegionSet set = regionManager.getApplicableRegions(loc);
             if (!(set.allows(DefaultFlag.OTHER_EXPLOSION))) {
-                int packed = EnchantMoreListener.packEnchItem(itemId, ench);
+                String packed = EnchantMoreListener.packEnchItem(material, ench);
                 if (verboseLogger()) {
-                    this.getLogger().info("Effect " + Material.getMaterial(itemId) + "(" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                    this.getLogger().info("Effect " + material.name() + " + " + ench + " = " + packed + " blocked by WorldGuard.");
                 }
-                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + Material.getMaterial(itemId) + " (" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + material.name() + " + " + ench + " = " + packed + " blocked by WorldGuard.");
             }
             return set.allows(DefaultFlag.OTHER_EXPLOSION);
         }
         return true;
     }
 
-    public boolean canDropItem(Player player, Block block, int itemId, Enchantment ench) { //Check if WorldGuard allows dropping an item at a block's location
+    public boolean canDropItem(Player player, Block block, Material material, Enchantment ench) { //Check if WorldGuard allows dropping an item at a block's location
         if (wg != null) {
             World world = block.getWorld();
             Location loc = block.getLocation();
             RegionManager regionManager = wg.getRegionManager(world);
             ApplicableRegionSet set = regionManager.getApplicableRegions(loc);
             if (!(set.allows(DefaultFlag.ITEM_DROP))) {
-                int packed = EnchantMoreListener.packEnchItem(itemId, ench);
+                String packed = EnchantMoreListener.packEnchItem(material, ench);
                 if (verboseLogger()) {
-                    this.getLogger().info("Effect " + Material.getMaterial(itemId) + "(" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                    this.getLogger().info("Effect " + material.name() + " + " + ench + " = " + packed + " blocked by WorldGuard.");
                 }
-                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + Material.getMaterial(itemId) + " (" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + material.name() + " + " + ench + " = " + packed + " blocked by WorldGuard.");
             }
             return set.allows(DefaultFlag.ITEM_DROP);
         }
         return true;
     }
 
-    public boolean canDropItem(Player player, Location loc, int itemId, Enchantment ench) { //Check if WorldGuard allows dropping an item at a location
+    public boolean canDropItem(Player player, Location loc, Material material, Enchantment ench) { //Check if WorldGuard allows dropping an item at a location
         if (wg != null) {
             World world = loc.getWorld();
             RegionManager regionManager = wg.getRegionManager(world);
             ApplicableRegionSet set = regionManager.getApplicableRegions(loc);
             if (!(set.allows(DefaultFlag.ITEM_DROP))) {
-                int packed = EnchantMoreListener.packEnchItem(itemId, ench);
+                String packed = EnchantMoreListener.packEnchItem(material, ench);
                 if (verboseLogger()) {
-                    this.getLogger().info("Effect " + Material.getMaterial(itemId) + "(" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                    this.getLogger().info("Effect " + material.name() + " + " + ench + " = " + packed + " blocked by WorldGuard.");
                 }
-                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + Material.getMaterial(itemId) + " (" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + material.name() + " + " + ench + " = " + packed + " blocked by WorldGuard.");
             }
             return set.allows(DefaultFlag.ITEM_DROP);
         }
         return true;
     }
 
-    public boolean canBuild(Player player, Location loc, int itemId, Enchantment ench) {
+    public boolean canBuild(Player player, Location loc, Material material, Enchantment ench) {
         if (wg != null) {
             if (loc == null) {
                 return true;
             }
             if (!wg.canBuild(player, loc)) {
-                int packed = EnchantMoreListener.packEnchItem(itemId, ench);
+                String packed = EnchantMoreListener.packEnchItem(material, ench);
                 if (verboseLogger()) {
-                    this.getLogger().info("Effect " + Material.getMaterial(itemId) + "(" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                    this.getLogger().info("Effect " + material.name() +  " + " + ench + " = " + packed + " blocked by WorldGuard.");
                 }
-                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + Material.getMaterial(itemId) + " (" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + material.name() + " + " + ench + " = " + packed + " blocked by WorldGuard.");
             }
             return wg.canBuild(player, loc);
         }
         return true;
     }
 
-    public boolean canBuild(Player player, Block block, int itemId, Enchantment ench) {
+    public boolean canBuild(Player player, Block block,Material material, Enchantment ench) {
         if (wg != null) {
             if (block == null) {
                 return true;
             }
             if (!wg.canBuild(player, block)) {
-                int packed = EnchantMoreListener.packEnchItem(itemId, ench);
+                String packed = EnchantMoreListener.packEnchItem(material, ench);
                 if (verboseLogger()) {
-                    this.getLogger().info("Effect " + Material.getMaterial(itemId) + "(" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                    this.getLogger().info("Effect " + material.name() + " + " + ench + " = " + packed + " blocked by WorldGuard.");
                 }
-                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " + Material.getMaterial(itemId) + " (" + itemId + ") + " + ench + " = " + packed + " blocked by WorldGuard.");
+                player.sendMessage(ChatColor.GOLD + "[EnchantMore] " + ChatColor.RED + "Effect " +material.name() + " + " + ench + " = " + packed + " blocked by WorldGuard.");
             }
             return wg.canBuild(player, block);
         }
@@ -313,8 +313,8 @@ public class EnchantMore extends JavaPlugin {
         return true;
     }
 
-    public boolean safeSetBlock(Player player, Block block, Material type, int itemId, Enchantment ench) {
-        if (!canBuild(player, block, itemId, ench)) {
+    public boolean safeSetBlock(Player player, Block block, Material type, Material material, Enchantment ench) {
+        if (!canBuild(player, block, material, ench)) {
             return false;
         }
         block.setType(type);
